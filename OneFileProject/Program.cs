@@ -12,9 +12,19 @@ namespace OneFileProject
 {
     class Program
     {
+        // Array of ur included libraries
+        private static Assembly[] includedLibraries = new Assembly[] 
+        {
+            Assembly.Load(DecompressAssembly(Resources.ClassLibraryForTest_dll))
+            /*
+             * If u don't compress ur assambly make this:
+             * 
+             * Assembly.Load(Resources.ClassLibraryForTest_dll)
+             */
+        };
+
         static void Main(string[] args)
         {
-            // 
             AppDomain.CurrentDomain.AssemblyResolve += AppDomain_AssemblyResolve;
 
             /*
@@ -46,38 +56,37 @@ namespace OneFileProject
         }
 
         /// <summary>
-        /// Loading assambly from resources
-        /// More info at: http://habrahabr.ru/post/85480/, thank you http://habrahabr.ru/users/FallenGameR/
+        /// Get included assambly
         /// </summary>
         private static Assembly AppDomain_AssemblyResolve(object sender, ResolveEventArgs args)
         {
-            if (args.Name.Contains("ClassLibraryForTest"))
+            return includedLibraries.SingleOrDefault(w => w.FullName == args.Name);
+        }
+
+        /// <summary>
+        /// Decompress assembly
+        /// </summary>
+        /// <param name="compressedAssamblyData">Compressed assembly bytes data</param>
+        /// <returns>Decompress assembly bytes data</returns>
+        private static byte[] DecompressAssembly(byte[] compressedAssamblyData)
+        {
+            using (var resource = new MemoryStream(compressedAssamblyData))
             {
-                Console.WriteLine("Resolving assembly: {0}", args.Name);
-
-                using (var resource = new MemoryStream(Resources.ClassLibraryForTest_dll))
+                using (var deflated = new DeflateStream(resource, CompressionMode.Decompress))
                 {
-                    using (MemoryStream resultStream = new MemoryStream())
+                    int dllReadBufferSize = 1024;
+
+                    List<byte> libData = new List<byte>();
+                    byte[] buffer = new byte[dllReadBufferSize];
+
+                    while (deflated.Read(buffer, 0, dllReadBufferSize) > 0)
                     {
-                        using (var deflated = new DeflateStream(resource, CompressionMode.Decompress))
-                        {
-                            int dllReadBufferSize = 1024;
-
-                            List<byte> libData = new List<byte>();
-                            byte[] buffer = new byte[dllReadBufferSize];
-                            
-                            while (deflated.Read(buffer, 0, dllReadBufferSize) > 0)
-                            {
-                                libData.AddRange(buffer);
-                            }
-
-                            return Assembly.Load(libData.ToArray());
-                        }
+                        libData.AddRange(buffer);
                     }
+
+                    return libData.ToArray();
                 }
             }
-
-            return null;
         }
     }
 }
